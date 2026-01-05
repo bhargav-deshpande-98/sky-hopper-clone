@@ -19,6 +19,16 @@ export default {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        game: {
+          sky: "hsl(var(--game-sky))",
+          cloud: "hsl(var(--game-cloud))",
+          platform: "hsl(var(--game-platform))",
+          "platform-dark": "hsl(var(--game-platform-dark))",
+          hammer: "hsl(var(--game-hammer))",
+          "hammer-handle": "hsl(var(--game-hammer-handle))",
+          character: "hsl(var(--game-character-body))",
+          "character-face": "hsl(var(--game-character-face))",
+        },
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
