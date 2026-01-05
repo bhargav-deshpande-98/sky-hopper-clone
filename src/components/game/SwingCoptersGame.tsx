@@ -14,12 +14,10 @@ export const SwingCoptersGame: React.FC = () => {
   
   useEffect(() => {
     const updateDimensions = () => {
-      if (containerRef.current) {
-        setDimensions({
-          width: Math.min(window.innerWidth, 420),
-          height: window.innerHeight,
-        });
-      }
+      setDimensions({
+        width: Math.min(window.innerWidth, 420),
+        height: window.innerHeight,
+      });
     };
     
     updateDimensions();
@@ -32,7 +30,7 @@ export const SwingCoptersGame: React.FC = () => {
     dimensions.height
   );
   
-  // Generate clouds for background
+  // Generate clouds for parallax background
   const clouds = React.useMemo(() => [
     { x: 20, y: 100, scale: 0.8 },
     { x: dimensions.width - 150, y: 250, scale: 1 },
@@ -63,54 +61,54 @@ export const SwingCoptersGame: React.FC = () => {
       onTouchStart={handleTouch}
       onMouseDown={handleTouch}
     >
-      {/* Clouds (parallax background) */}
+      {/* Clouds (slow parallax - clouds move down slower than platforms) */}
       {clouds.map((cloud, i) => (
         <Cloud
           key={i}
           x={cloud.x}
-          y={(cloud.y + gameState.cameraY * 0.3) % (dimensions.height + 100)}
+          y={(cloud.y + gameState.scrollOffset * 0.2) % (dimensions.height + 100)}
           scale={cloud.scale}
         />
       ))}
       
-      {/* Platforms and Hammers */}
-      {gameState.platforms.map(platform => {
-        const screenY = platform.y - gameState.cameraY;
-        if (screenY < -100 || screenY > dimensions.height + 100) return null;
-        
-        return (
-          <React.Fragment key={platform.id}>
-            <Platform
-              y={screenY}
-              gapX={platform.gapX}
-              gapWidth={platform.gapWidth}
-              screenWidth={dimensions.width}
-            />
-            {/* Left hammer */}
-            <Hammer
-              x={platform.gapX - 12}
-              y={screenY + 24}
-              angle={platform.hammerAngle}
-              side="left"
-            />
-            {/* Right hammer */}
-            <Hammer
-              x={platform.gapX + platform.gapWidth + 12}
-              y={screenY + 24}
-              angle={-platform.hammerAngle}
-              side="right"
-            />
-          </React.Fragment>
-        );
-      })}
-      
-      {/* Character */}
-      <Character
-        x={gameState.characterX}
-        y={gameState.characterY}
-        rotation={gameState.characterRotation}
-        propellerAngle={gameState.propellerAngle}
-      />
+      {/* Only render game elements when not on start screen */}
+      {gameState.gameStatus !== 'idle' && (
+        <>
+          {/* Platforms and Hammers - they scroll DOWN as scrollOffset increases */}
+          {gameState.platforms.map(platform => {
+            const screenY = platform.y + gameState.scrollOffset;
+            
+            // Only render platforms that are on screen
+            if (screenY < -100 || screenY > dimensions.height + 100) return null;
+            
+            return (
+              <React.Fragment key={platform.id}>
+                <Platform
+                  y={screenY}
+                  gapX={platform.gapX}
+                  gapWidth={platform.gapWidth}
+                  screenWidth={dimensions.width}
+                />
+                {/* Single hammer in the center of the gap */}
+                <Hammer
+                  x={platform.gapX + platform.gapWidth / 2}
+                  y={screenY + 24}
+                  angle={platform.hammerAngle}
+                  side="left"
+                />
+              </React.Fragment>
+            );
+          })}
+          
+          {/* Character - stays at fixed vertical position, moves horizontally */}
+          <Character
+            x={gameState.characterX}
+            y={gameState.characterY}
+            rotation={gameState.characterRotation}
+            propellerAngle={gameState.propellerAngle}
+          />
+        </>
+      )}
       
       {/* UI Elements */}
       {gameState.gameStatus === 'playing' && (

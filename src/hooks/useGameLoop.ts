@@ -10,12 +10,12 @@ interface GameState {
   platforms: Platform[];
   score: number;
   gameStatus: 'idle' | 'playing' | 'gameover';
-  cameraY: number;
+  scrollOffset: number;
 }
 
 interface Platform {
   id: number;
-  y: number;
+  y: number; // This is the base Y position, scrollOffset will be added
   gapX: number;
   gapWidth: number;
   hammerAngle: number;
@@ -23,20 +23,20 @@ interface Platform {
   passed: boolean;
 }
 
-const GRAVITY_X = 0.3;
-const RISE_SPEED = 3;
-const MAX_VELOCITY_X = 6;
-const PLATFORM_SPACING = 200;
-const GAP_WIDTH = 70;
+const GRAVITY_X = 0.4;
+const SCROLL_SPEED = 2.5; // Platforms scroll down at this speed
+const MAX_VELOCITY_X = 7;
+const PLATFORM_SPACING = 180;
+const GAP_WIDTH = 75;
 const CHARACTER_WIDTH = 32;
 const CHARACTER_HEIGHT = 50;
-const HAMMER_SWING_SPEED = 0.04;
-const HAMMER_MAX_ANGLE = 0.8;
+const HAMMER_SWING_SPEED = 0.05;
+const HAMMER_MAX_ANGLE = 0.7;
 
 export const useGameLoop = (screenWidth: number, screenHeight: number) => {
   const [gameState, setGameState] = useState<GameState>({
     characterX: screenWidth / 2,
-    characterY: screenHeight - 150,
+    characterY: screenHeight * 0.65, // Character stays at 65% down the screen
     characterRotation: 0,
     velocityX: 0,
     direction: 1,
@@ -44,7 +44,7 @@ export const useGameLoop = (screenWidth: number, screenHeight: number) => {
     platforms: [],
     score: 0,
     gameStatus: 'idle',
-    cameraY: 0,
+    scrollOffset: 0,
   });
   
   const [highScore, setHighScore] = useState(() => {
@@ -60,17 +60,17 @@ export const useGameLoop = (screenWidth: number, screenHeight: number) => {
     gameStateRef.current = gameState;
   }, [gameState]);
   
-  const generatePlatform = useCallback((id: number, y: number): Platform => {
-    const minGapX = 60;
-    const maxGapX = screenWidth - GAP_WIDTH - 60;
+  const generatePlatform = useCallback((id: number, baseY: number): Platform => {
+    const minGapX = 50;
+    const maxGapX = screenWidth - GAP_WIDTH - 50;
     const gapX = minGapX + Math.random() * (maxGapX - minGapX);
     
     return {
       id,
-      y,
+      y: baseY,
       gapX,
       gapWidth: GAP_WIDTH,
-      hammerAngle: Math.random() * HAMMER_MAX_ANGLE - HAMMER_MAX_ANGLE / 2,
+      hammerAngle: (Math.random() - 0.5) * HAMMER_MAX_ANGLE,
       hammerDirection: Math.random() > 0.5 ? 1 : -1,
       passed: false,
     };
@@ -78,13 +78,17 @@ export const useGameLoop = (screenWidth: number, screenHeight: number) => {
   
   const initializeGame = useCallback(() => {
     const platforms: Platform[] = [];
-    for (let i = 0; i < 6; i++) {
-      platforms.push(generatePlatform(i, screenHeight - 300 - i * PLATFORM_SPACING));
+    // Generate platforms starting from above the character position going upward
+    // First platform starts a bit above the character
+    for (let i = 0; i < 8; i++) {
+      // Negative Y means above the starting scroll position
+      // These will appear above the character initially
+      platforms.push(generatePlatform(i, -100 - i * PLATFORM_SPACING));
     }
     
     setGameState({
       characterX: screenWidth / 2,
-      characterY: screenHeight - 150,
+      characterY: screenHeight * 0.65,
       characterRotation: 0,
       velocityX: 0,
       direction: Math.random() > 0.5 ? 1 : -1,
@@ -92,7 +96,7 @@ export const useGameLoop = (screenWidth: number, screenHeight: number) => {
       platforms,
       score: 0,
       gameStatus: 'idle',
-      cameraY: 0,
+      scrollOffset: 0,
     });
   }, [screenWidth, screenHeight, generatePlatform]);
   
@@ -100,7 +104,7 @@ export const useGameLoop = (screenWidth: number, screenHeight: number) => {
     charX: number,
     charY: number,
     platforms: Platform[],
-    cameraY: number
+    scrollOffset: number
   ): boolean => {
     const charLeft = charX - CHARACTER_WIDTH / 2;
     const charRight = charX + CHARACTER_WIDTH / 2;
@@ -114,36 +118,47 @@ export const useGameLoop = (screenWidth: number, screenHeight: number) => {
     
     // Check platform collision
     for (const platform of platforms) {
-      const platformScreenY = platform.y - cameraY;
+      // Platform screen Y = platform.y + scrollOffset
+      // As scrollOffset increases, platforms move DOWN the screen
+      const platformScreenY = platform.y + scrollOffset;
       const platformTop = platformScreenY;
       const platformBottom = platformScreenY + 24;
       
+      // Skip platforms not near the character
+      if (platformBottom < charTop - 20 || platformTop > charBottom + 20) {
+        continue;
+      }
+      
       // Check if character is at platform height
       if (charBottom > platformTop && charTop < platformBottom) {
-        // Check if NOT in the gap
+        // Check if NOT in the gap (collision with platform bars)
         if (charRight < platform.gapX || charLeft > platform.gapX + platform.gapWidth) {
           return true;
         }
-        
-        // Check hammer collision
-        const hammerX = platform.gapX + platform.gapWidth / 2 + Math.sin(platform.hammerAngle) * 50;
-        const hammerY = platformScreenY + 50 + Math.cos(platform.hammerAngle) * 50;
-        const hammerWidth = 24;
-        const hammerHeight = 36;
-        
-        const hammerLeft = hammerX - hammerWidth / 2;
-        const hammerRight = hammerX + hammerWidth / 2;
-        const hammerTop = hammerY;
-        const hammerBottom = hammerY + hammerHeight;
-        
-        if (
-          charRight > hammerLeft &&
-          charLeft < hammerRight &&
-          charBottom > hammerTop &&
-          charTop < hammerBottom
-        ) {
-          return true;
-        }
+      }
+      
+      // Check hammer collision (hammers hang below the platform)
+      const hammerPivotX = platform.gapX + platform.gapWidth / 2;
+      const hammerPivotY = platformScreenY + 24;
+      const chainLength = 45;
+      
+      const hammerX = hammerPivotX + Math.sin(platform.hammerAngle) * chainLength;
+      const hammerY = hammerPivotY + Math.cos(platform.hammerAngle) * chainLength;
+      const hammerWidth = 22;
+      const hammerHeight = 32;
+      
+      const hammerLeft = hammerX - hammerWidth / 2;
+      const hammerRight = hammerX + hammerWidth / 2;
+      const hammerTop = hammerY;
+      const hammerBottom = hammerY + hammerHeight;
+      
+      if (
+        charRight > hammerLeft &&
+        charLeft < hammerRight &&
+        charBottom > hammerTop &&
+        charTop < hammerBottom
+      ) {
+        return true;
       }
     }
     
@@ -162,64 +177,70 @@ export const useGameLoop = (screenWidth: number, screenHeight: number) => {
       return;
     }
     
-    // Update propeller
-    const newPropellerAngle = (state.propellerAngle + 30 * deltaTime) % 360;
+    // Update propeller animation
+    const newPropellerAngle = (state.propellerAngle + 35 * deltaTime) % 360;
     
-    // Apply horizontal gravity
+    // Apply horizontal gravity (character swings left/right)
     let newVelocityX = state.velocityX + GRAVITY_X * state.direction * deltaTime;
     newVelocityX = Math.max(-MAX_VELOCITY_X, Math.min(MAX_VELOCITY_X, newVelocityX));
     
-    // Update position
+    // Update character X position
     const newCharacterX = state.characterX + newVelocityX * deltaTime;
     
-    // Camera follows character going up
-    const targetCameraY = Math.max(0, (screenHeight - 150 - state.characterY) + state.cameraY);
-    const newCameraY = state.cameraY + RISE_SPEED * deltaTime;
-    
-    // Character stays roughly centered vertically, camera moves up
-    const newCharacterY = screenHeight - 150;
+    // Scroll offset increases = platforms move DOWN the screen
+    const newScrollOffset = state.scrollOffset + SCROLL_SPEED * deltaTime;
     
     // Calculate character rotation based on velocity
-    const newRotation = (newVelocityX / MAX_VELOCITY_X) * 20;
+    const newRotation = (newVelocityX / MAX_VELOCITY_X) * 25;
     
-    // Update platforms (move them down relative to camera, add new ones)
-    let newPlatforms = state.platforms.map(p => ({
-      ...p,
-      hammerAngle: p.hammerAngle + HAMMER_SWING_SPEED * p.hammerDirection * deltaTime,
-      hammerDirection: Math.abs(p.hammerAngle) > HAMMER_MAX_ANGLE 
-        ? -p.hammerDirection as 1 | -1
-        : p.hammerDirection,
-    }));
+    // Update hammer swing animations
+    let newPlatforms = state.platforms.map(p => {
+      let newAngle = p.hammerAngle + HAMMER_SWING_SPEED * p.hammerDirection * deltaTime;
+      let newDirection = p.hammerDirection;
+      
+      if (Math.abs(newAngle) > HAMMER_MAX_ANGLE) {
+        newDirection = -p.hammerDirection as 1 | -1;
+        newAngle = Math.sign(newAngle) * HAMMER_MAX_ANGLE;
+      }
+      
+      return {
+        ...p,
+        hammerAngle: newAngle,
+        hammerDirection: newDirection,
+      };
+    });
     
-    // Check for score
+    // Check for score - when platform scrolls past the character
     let newScore = state.score;
+    const charY = state.characterY;
+    
     newPlatforms = newPlatforms.map(p => {
-      const platformScreenY = p.y - newCameraY;
-      if (!p.passed && platformScreenY > newCharacterY) {
+      const platformScreenY = p.y + newScrollOffset;
+      // Platform passed when it goes below the character
+      if (!p.passed && platformScreenY > charY) {
+        newScore++;
         return { ...p, passed: true };
       }
       return p;
     });
     
-    const passedPlatforms = newPlatforms.filter(p => p.passed).length;
-    if (passedPlatforms > state.score) {
-      newScore = passedPlatforms;
-    }
+    // Remove platforms that are too far below screen and add new ones at top
+    newPlatforms = newPlatforms.filter(p => {
+      const platformScreenY = p.y + newScrollOffset;
+      return platformScreenY < screenHeight + 100;
+    });
     
-    // Remove platforms that are too far below and add new ones at top
-    const highestPlatform = Math.min(...newPlatforms.map(p => p.y));
-    newPlatforms = newPlatforms.filter(p => p.y - newCameraY < screenHeight + 100);
-    
-    while (newPlatforms.length < 6) {
-      const lowestY = Math.min(...newPlatforms.map(p => p.y));
+    // Add new platforms at the top
+    while (newPlatforms.length < 8) {
+      const highestY = Math.min(...newPlatforms.map(p => p.y));
       newPlatforms.push(generatePlatform(
-        Date.now() + Math.random(),
-        lowestY - PLATFORM_SPACING
+        Date.now() + Math.random() * 1000,
+        highestY - PLATFORM_SPACING
       ));
     }
     
     // Check collision
-    if (checkCollision(newCharacterX, newCharacterY, newPlatforms, newCameraY)) {
+    if (checkCollision(newCharacterX, charY, newPlatforms, newScrollOffset)) {
       // Game over
       const finalScore = newScore;
       if (finalScore > highScore) {
@@ -237,7 +258,7 @@ export const useGameLoop = (screenWidth: number, screenHeight: number) => {
     
     setGameState({
       characterX: newCharacterX,
-      characterY: newCharacterY,
+      characterY: charY,
       characterRotation: newRotation,
       velocityX: newVelocityX,
       direction: state.direction,
@@ -245,7 +266,7 @@ export const useGameLoop = (screenWidth: number, screenHeight: number) => {
       platforms: newPlatforms,
       score: newScore,
       gameStatus: 'playing',
-      cameraY: newCameraY,
+      scrollOffset: newScrollOffset,
     });
     
     animationFrameRef.current = requestAnimationFrame(gameLoop);
@@ -253,12 +274,14 @@ export const useGameLoop = (screenWidth: number, screenHeight: number) => {
   
   const startGame = useCallback(() => {
     initializeGame();
-    setGameState(prev => ({
-      ...prev,
-      gameStatus: 'playing',
-    }));
-    lastTimeRef.current = 0;
-    animationFrameRef.current = requestAnimationFrame(gameLoop);
+    setTimeout(() => {
+      setGameState(prev => ({
+        ...prev,
+        gameStatus: 'playing',
+      }));
+      lastTimeRef.current = 0;
+      animationFrameRef.current = requestAnimationFrame(gameLoop);
+    }, 50);
   }, [initializeGame, gameLoop]);
   
   const handleTap = useCallback(() => {
@@ -266,12 +289,16 @@ export const useGameLoop = (screenWidth: number, screenHeight: number) => {
       setGameState(prev => ({
         ...prev,
         direction: prev.direction === 1 ? -1 : 1,
-        velocityX: prev.velocityX * 0.3, // Reduce velocity on direction change
+        velocityX: prev.velocityX * 0.2, // Reduce velocity on direction change for snappier control
       }));
     }
   }, []);
   
   const restartGame = useCallback(() => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = undefined;
+    }
     initializeGame();
     setTimeout(() => {
       setGameState(prev => ({
@@ -291,21 +318,6 @@ export const useGameLoop = (screenWidth: number, screenHeight: number) => {
       }
     };
   }, [initializeGame]);
-  
-  // Start the game loop when status changes to playing
-  useEffect(() => {
-    if (gameState.gameStatus === 'playing' && !animationFrameRef.current) {
-      lastTimeRef.current = 0;
-      animationFrameRef.current = requestAnimationFrame(gameLoop);
-    }
-    
-    return () => {
-      if (gameState.gameStatus !== 'playing' && animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = undefined;
-      }
-    };
-  }, [gameState.gameStatus, gameLoop]);
   
   return {
     gameState,
