@@ -23,15 +23,15 @@ interface Platform {
   passed: boolean;
 }
 
-const GRAVITY_X = 0.4;
-const SCROLL_SPEED = 2.5; // Platforms scroll down at this speed
-const MAX_VELOCITY_X = 7;
-const PLATFORM_SPACING = 180;
-const GAP_WIDTH = 75;
+const GRAVITY_X = 0.25; // Slower horizontal acceleration (easier control)
+const SCROLL_SPEED = 1.8; // Slower scroll speed (more time to react)
+const MAX_VELOCITY_X = 5; // Lower max speed (easier to control)
+const PLATFORM_SPACING = 200; // More space between platforms
+const GAP_WIDTH = 110; // Much wider gap (easier to pass through)
 const CHARACTER_WIDTH = 32;
 const CHARACTER_HEIGHT = 50;
-const HAMMER_SWING_SPEED = 0.05;
-const HAMMER_MAX_ANGLE = 0.7;
+const HAMMER_SWING_SPEED = 0.03; // Slower hammer swing
+const HAMMER_MAX_ANGLE = 0.5; // Smaller swing arc
 
 export const useGameLoop = (screenWidth: number, screenHeight: number) => {
   const [gameState, setGameState] = useState<GameState>({
@@ -137,29 +137,7 @@ export const useGameLoop = (screenWidth: number, screenHeight: number) => {
         }
       }
       
-      // Check hammer collision (hammers hang below the platform)
-      const hammerPivotX = platform.gapX + platform.gapWidth / 2;
-      const hammerPivotY = platformScreenY + 24;
-      const chainLength = 45;
-      
-      const hammerX = hammerPivotX + Math.sin(platform.hammerAngle) * chainLength;
-      const hammerY = hammerPivotY + Math.cos(platform.hammerAngle) * chainLength;
-      const hammerWidth = 22;
-      const hammerHeight = 32;
-      
-      const hammerLeft = hammerX - hammerWidth / 2;
-      const hammerRight = hammerX + hammerWidth / 2;
-      const hammerTop = hammerY;
-      const hammerBottom = hammerY + hammerHeight;
-      
-      if (
-        charRight > hammerLeft &&
-        charLeft < hammerRight &&
-        charBottom > hammerTop &&
-        charTop < hammerBottom
-      ) {
-        return true;
-      }
+      // Hammers removed for easier gameplay
     }
     
     return false;

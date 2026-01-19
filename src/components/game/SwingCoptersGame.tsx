@@ -89,13 +89,7 @@ export const SwingCoptersGame: React.FC = () => {
                   gapWidth={platform.gapWidth}
                   screenWidth={dimensions.width}
                 />
-                {/* Single hammer in the center of the gap */}
-                <Hammer
-                  x={platform.gapX + platform.gapWidth / 2}
-                  y={screenY + 24}
-                  angle={platform.hammerAngle}
-                  side="left"
-                />
+                {/* Hammers removed for easier gameplay */}
               </React.Fragment>
             );
           })}
