@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { initAudio, playTapSound, playScoreSound, playDeathSound } from '@/lib/sounds';
 
 interface GameState {
   characterX: number;
@@ -197,6 +198,7 @@ export const useGameLoop = (screenWidth: number, screenHeight: number) => {
       // Platform passed when it goes below the character
       if (!p.passed && platformScreenY > charY) {
         newScore++;
+        playScoreSound(newScore);
         return { ...p, passed: true };
       }
       return p;
@@ -220,6 +222,7 @@ export const useGameLoop = (screenWidth: number, screenHeight: number) => {
     // Check collision
     if (checkCollision(newCharacterX, charY, newPlatforms, newScrollOffset)) {
       // Game over
+      playDeathSound();
       const finalScore = newScore;
       if (finalScore > highScore) {
         setHighScore(finalScore);
@@ -251,6 +254,7 @@ export const useGameLoop = (screenWidth: number, screenHeight: number) => {
   }, [screenHeight, checkCollision, generatePlatform, highScore]);
   
   const startGame = useCallback(() => {
+    initAudio();
     initializeGame();
     setTimeout(() => {
       setGameState(prev => ({
@@ -264,6 +268,7 @@ export const useGameLoop = (screenWidth: number, screenHeight: number) => {
   
   const handleTap = useCallback(() => {
     if (gameStateRef.current.gameStatus === 'playing') {
+      playTapSound();
       setGameState(prev => ({
         ...prev,
         direction: prev.direction === 1 ? -1 : 1,
@@ -277,6 +282,7 @@ export const useGameLoop = (screenWidth: number, screenHeight: number) => {
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = undefined;
     }
+    initAudio();
     initializeGame();
     setTimeout(() => {
       setGameState(prev => ({
